@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { BLOCKS, Block } from "@/lib/blocks";
 import { NODATA, WORLD, blockToUtm, fromUtm } from "@/lib/inw/grid";
@@ -406,6 +407,7 @@ export function WorldMap() {
     <div className="relative h-dvh w-full overflow-hidden bg-[#14202a] text-[#1c1915]">
       <div ref={holder} className="absolute inset-0" />
       <div className="absolute top-3 left-3 max-w-sm rounded-2xl bg-[#fffaf3]/94 px-4 py-3 text-sm shadow-sm">
+        <Link href="/ufos" className="mb-2 inline-block text-xs font-semibold text-[#234e45] underline underline-offset-2">UFO Studio</Link>
         <div className="flex flex-col gap-1 text-xs">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked readOnly disabled /> Terrain

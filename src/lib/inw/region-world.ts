@@ -109,7 +109,7 @@ function fillBlock(column: Column, y: number, x: number, z: number, mark: number
   return Block.Stone;
 }
 
-export function levelDat(name: string, spawn: { x: number; y: number; z: number }, seed: bigint, flatStoneLayers = 124): Buffer {
+export function levelDat(name: string, spawn: { x: number; y: number; z: number }, seed: bigint, flatStoneLayers = 124, tntExplodes = false): Buffer {
   const flag = (on: boolean) => byte(on ? 1 : 0);
   const layers = JSON.stringify({
     biome_id: BIOME_PLAINS,
@@ -243,7 +243,7 @@ export function levelDat(name: string, spawn: { x: number; y: number; z: number 
     showdeathmessages: flag(true),
     showrecipemessages: flag(true),
     showtags: flag(true),
-    tntexplodes: flag(false),
+    tntexplodes: flag(tntExplodes),
   });
   const header = Buffer.alloc(8);
   header.writeInt32LE(10, 0);

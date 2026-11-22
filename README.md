@@ -1,6 +1,6 @@
 # Coeur d’Alene Minecraft generators
 
-Generate furnished Coeur d’Alene houses, procedural Minecraft terrain, or Bedrock map sections from Inland Northwest geography. This repository contains the app, generator source, and small input recipes. Generated worlds, map tiles, and downloaded datasets live under the ignored `data/` directory.
+Generate furnished Coeur d’Alene houses, UFOs, procedural Minecraft terrain, or Bedrock map sections from Inland Northwest geography. This repository contains the app, generator source, and small input recipes. Generated worlds, map tiles, and downloaded datasets live under the ignored `data/` directory.
 
 ## Start the app
 
@@ -14,11 +14,20 @@ npm run dev
 | Local page | What you can generate |
 | --- | --- |
 | [House Studio](http://localhost:4317/houses) | Pick a style, era, tier, and seed. Compare six designs, inspect floor plans and loot, and export a furnished house as a standalone Bedrock world. No geographic data is needed. |
+| [UFO Studio](http://localhost:4317/ufos) | Generate Classic and Xenos ships or Blight asteroids. Inspect their interiors and crash sites, then export a standalone Bedrock world. No geographic data is needed. |
 | [Terrain Generator](http://localhost:4317/terrain) | Create a small procedural world with a controlled seed, terrain style, and spawn. No geographic data is needed. |
 | [Regional Map](http://localhost:4317/) | View locally built Inland Northwest map tiles and export a selected area as a Bedrock world. |
 | [Arnis Archive](http://localhost:4317/arnis) | Preview local Bedrock archives under `data/archive/arnis/worlds/` or `data/archive/arnis/inland-northwest/`. |
 
 Open exported `.mcworld` files with Minecraft Bedrock Edition. The house export uses the same brief and seed as the preview, including furniture, beds, and tiered chest inventories.
+
+## UFO Studio
+
+Choose a civilization, hull or asteroid, condition, and optional seed. Classic
+and Xenos ships have two walkable decks. Blight asteroids have four connected
+cave levels, concealed ledge entrances, and mineable ore. Larger builds
+contain more small salvage caches. Each crash or wreck has one trapped
+chest that primes TNT when opened.
 
 ## Build regional data locally
 
