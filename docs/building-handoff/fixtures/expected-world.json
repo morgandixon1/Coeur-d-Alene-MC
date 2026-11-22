@@ -1,0 +1,431 @@
+{
+  "format": "inw-building-fixtures-v1",
+  "utmOrigin": {
+    "e": 516483,
+    "n": 5280502
+  },
+  "terrain": {
+    "crop": {
+      "x0": -128,
+      "z0": -128,
+      "size": 256
+    },
+    "groundY": 64,
+    "roads": [
+      {
+        "x0": -96,
+        "z0": -70,
+        "x1": -38,
+        "z1": -64
+      }
+    ],
+    "water": [
+      {
+        "x0": 78,
+        "z0": 66,
+        "x1": 108,
+        "z1": 100
+      }
+    ],
+    "poi": [
+      {
+        "x0": 10,
+        "z0": 85,
+        "x1": 27,
+        "z1": 105
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "rotated-32",
+      "expected": {
+        "envelopeCenterXZ": [
+          42,
+          -38
+        ],
+        "axisBearingDeg": 32,
+        "lengthM": 18,
+        "widthM": 10,
+        "heightM": 7.2,
+        "floors": null,
+        "placement": "eligible",
+        "reason": null
+      },
+      "worldPolygonsXZ": [
+        [
+          [
+            [
+              32.99048614111903,
+              -33.01716345575819
+            ],
+            [
+              42.52903289731672,
+              -48.28202918657386
+            ],
+            [
+              51.00951385888097,
+              -42.98283654424181
+            ],
+            [
+              41.47096710268328,
+              -27.71797081342614
+            ],
+            [
+              32.99048614111903,
+              -33.01716345575819
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "rotated-l",
+      "expected": {
+        "envelopeCenterXZ": [
+          -52,
+          36
+        ],
+        "axisBearingDeg": 122,
+        "lengthM": 20,
+        "widthM": 14,
+        "heightM": null,
+        "floors": null,
+        "placement": "eligible",
+        "reason": null
+      },
+      "worldPolygonsXZ": [
+        [
+          [
+            [
+              -56.771046111931824,
+              24.76447068457297
+            ],
+            [
+              -39.8100841888033,
+              35.36285596923706
+            ],
+            [
+              -42.98959977420253,
+              40.45114454617562
+            ],
+            [
+              -49.77398454345394,
+              36.21179043230998
+            ],
+            [
+              -54.01333865731958,
+              42.99617520156139
+            ],
+            [
+              -64.1899158111967,
+              36.63714403076293
+            ],
+            [
+              -56.771046111931824,
+              24.76447068457297
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "square",
+      "expected": {
+        "envelopeCenterXZ": [
+          32,
+          37
+        ],
+        "axisBearingDeg": null,
+        "lengthM": 12,
+        "widthM": 12,
+        "heightM": null,
+        "floors": 2,
+        "placement": "eligible",
+        "reason": null
+      },
+      "worldPolygonsXZ": [
+        [
+          [
+            [
+              24.37347961966116,
+              40.71970252685296
+            ],
+            [
+              28.280297473147037,
+              29.37347961966116
+            ],
+            [
+              39.62652038033884,
+              33.28029747314704
+            ],
+            [
+              35.71970252685296,
+              44.62652038033884
+            ],
+            [
+              24.37347961966116,
+              40.71970252685296
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "courtyard-crosses-negative-chunks",
+      "expected": {
+        "envelopeCenterXZ": [
+          -16,
+          -16
+        ],
+        "axisBearingDeg": 90,
+        "lengthM": 24,
+        "widthM": 16,
+        "heightM": 8,
+        "floors": null,
+        "placement": "eligible",
+        "reason": null
+      },
+      "worldPolygonsXZ": [
+        [
+          [
+            [
+              -28,
+              -24
+            ],
+            [
+              -4.000000000000001,
+              -24
+            ],
+            [
+              -3.9999999999999996,
+              -8
+            ],
+            [
+              -28,
+              -8
+            ],
+            [
+              -28,
+              -24
+            ]
+          ],
+          [
+            [
+              -20,
+              -19
+            ],
+            [
+              -12,
+              -19
+            ],
+            [
+              -12,
+              -13
+            ],
+            [
+              -20,
+              -13
+            ],
+            [
+              -20,
+              -19
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "multipart",
+      "expected": {
+        "envelopeCenterXZ": [
+          -85,
+          -87
+        ],
+        "axisBearingDeg": 90,
+        "lengthM": 22,
+        "widthM": 10,
+        "heightM": 5.8,
+        "floors": null,
+        "placement": "eligible",
+        "reason": null
+      },
+      "worldPolygonsXZ": [
+        [
+          [
+            [
+              -96,
+              -92
+            ],
+            [
+              -84,
+              -92
+            ],
+            [
+              -84,
+              -82
+            ],
+            [
+              -96,
+              -82
+            ],
+            [
+              -96,
+              -92
+            ]
+          ]
+        ],
+        [
+          [
+            [
+              -79,
+              -90
+            ],
+            [
+              -74,
+              -90
+            ],
+            [
+              -74,
+              -84
+            ],
+            [
+              -79,
+              -84
+            ],
+            [
+              -79,
+              -90
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "blocked-by-road",
+      "expected": {
+        "envelopeCenterXZ": [
+          -65,
+          -67
+        ],
+        "axisBearingDeg": 90,
+        "lengthM": 12,
+        "widthM": 10,
+        "heightM": null,
+        "floors": null,
+        "placement": "skipped",
+        "reason": "road"
+      },
+      "worldPolygonsXZ": [
+        [
+          [
+            [
+              -71,
+              -72
+            ],
+            [
+              -59,
+              -72
+            ],
+            [
+              -59,
+              -62
+            ],
+            [
+              -71,
+              -62
+            ],
+            [
+              -71,
+              -72
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "blocked-by-water",
+      "expected": {
+        "envelopeCenterXZ": [
+          92,
+          81
+        ],
+        "axisBearingDeg": 90,
+        "lengthM": 14,
+        "widthM": 10,
+        "heightM": null,
+        "floors": null,
+        "placement": "skipped",
+        "reason": "water"
+      },
+      "worldPolygonsXZ": [
+        [
+          [
+            [
+              85,
+              76
+            ],
+            [
+              99,
+              76
+            ],
+            [
+              99,
+              86
+            ],
+            [
+              85,
+              86
+            ],
+            [
+              85,
+              76
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "blocked-by-poi",
+      "expected": {
+        "envelopeCenterXZ": [
+          18,
+          95
+        ],
+        "axisBearingDeg": 90,
+        "lengthM": 14,
+        "widthM": 10,
+        "heightM": null,
+        "floors": null,
+        "placement": "skipped",
+        "reason": "poi"
+      },
+      "worldPolygonsXZ": [
+        [
+          [
+            [
+              11,
+              90
+            ],
+            [
+              25,
+              90
+            ],
+            [
+              25,
+              100
+            ],
+            [
+              11,
+              100
+            ],
+            [
+              11,
+              90
+            ]
+          ]
+        ]
+      ]
+    }
+  ]
+}
