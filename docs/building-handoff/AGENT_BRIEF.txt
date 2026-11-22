@@ -1,0 +1,136 @@
+BUILDING FOOTPRINT FITTING FOR INLAND NORTHWEST
+
+Task
+Implement footprint-driven building generation and placement for the local
+Coeur-d-Alene-MC app. Preserve its existing seeded House Studio workflow. Start
+with an opt-in adapter and a small test export. Deliver code and regression tests,
+plus steps to verify the feature on the local Regional Map. Keep production
+worlds, downloaded datasets, and personal machine paths out of Git.
+
+Where to work
+- src/lib/inw/grid.ts defines the coordinate conversion. Use its helpers.
+- src/lib/houses/generate.ts, plan.ts, build.ts, and roofs.ts hold the house
+  generator. The current HouseRequest accepts style, era, price, and seed.
+  Add footprint-aware planning only where needed. Keep existing calls working.
+- src/lib/inw/region-world.ts is the terrain/road regional Bedrock writer.
+  Inspect the receiving checkout for planting.ts and region-request.ts.
+  Some public branches may lack the newer local foliage changes. If absent,
+  return the clearance data described below for the local integrator.
+- src/lib/blocks.ts and src/lib/chunk.ts define Bedrock block states, chunk keys,
+  subchunks, and coordinate packing. Reuse existing definitions and encoding.
+- Preserve the existing export-size limit and the absolute X/Z grid.
+
+Input and projection
+- Production input is Overture's GeoJSON sequence at
+  data/sources/vegetation/buildings.geojsonseq when available. Each line is a
+  Feature with a top-level id, Polygon or MultiPolygon geometry in [lon, lat],
+  and optional properties.height, num_floors, subtype, class, roof_shape,
+  roof_direction, has_parts, and is_underground. Skip explicitly underground
+  features unless an underground mode is specifically selected. Keep each
+  source ID for deduplication, stable seeding, and review. Geometry can be a
+  roofprint. Retain courtyard holes and separate polygon components.
+- Project each vertex with toUtm(lat, lon), then utmToBlock(e, n).
+  This is NAD83 / UTM zone 11N (EPSG:26911), with origin E=516483, N=5280502.
+  The origin is the northwest corner of block (0,0). X is east, Z is south,
+  one block is one meter. Keep floating point vertices through fitting.
+  Rasterize integer cell (x,z) by its center (x+0.5,z+0.5). Keep half-open
+  bounds x0 <= x < x1 and z0 <= z < z1. Use floor division for negative
+  chunk coordinates and align regional crops using the repository helpers.
+- Compute the minimum-area rotated rectangle on projected geometry for a
+  starting envelope. Report its center, length of the long side, and width.
+  Report the main axis in [0,180) degrees clockwise from grid north. 0 points
+  along -Z, and 90 along +X. For a world vector (dx,dz), use atan2(dx,-dz)
+  converted to degrees and normalized modulo 180. Treat an envelope within
+  2% of square as having an ambiguous main axis and emit null. Keep the
+  entrance bearing separate in [0,360) or null. Use a confirmed access point
+  first, then a road/driveway hint when one side clearly wins. The roof ridge
+  bearing, when present, describes the roof only.
+- Prefer source height, then infer from floors and record your assumption.
+  If both are missing, choose a deterministic style-based height. Use local
+  terrain to derive the foundation Y. The map's existing terrain DEM is bare
+  earth and cannot directly supply roof height. Keep any estimated values
+  labeled. If no seed is supplied, derive it deterministically from the ID.
+
+Fitting and world composition
+- Fit exterior walls to the source polygon in block space. Use its actual cell
+  mask for corners, wings, and holes. The oriented rectangle supplies dimensions
+  and alignment. It does not fill concavities. Preserve disconnected components
+  unless you explicitly select and report one. Flag tight, conflicting, or
+  ambiguous fits before generating plausible-looking geometry.
+- Use axis-aligned wall/render states for the stair-stepped grid representation
+  of oblique sites. For exact quarter-turns, transform cardinal block states,
+  bed halves, doors, stairs, and entity coordinates together. For oblique sites,
+  fit the rasterized shell and regenerate doors, stairs, and furniture against
+  it. Keep doors reachable and beds/chests tied to their own placed blocks.
+- Reserve any hand-authored POIs, roads, and water first. Check proposed
+  buildings against them and against already placed building envelopes.
+  Skip and report conflicts. Preserve surrounding road/water blocks. A
+  separately validated entrance connection can meet a road without replacing
+  the road surface. Use local ground elevations to support walls and exits.
+- Merge accepted buildings at their absolute map positions before planning
+  foliage. Reserve final X/Z coverage of walls, eaves, garages, paths, and
+  driveways. For the existing local foliage planner, adapt those occupied
+  columns to half-open rectangles or merged row spans and pass them on the
+  server as footprints. The planner adds a 2 m buffer. Keep the full reserve
+  list in the composer. The browser's manual reserve API caps entries at 100
+  and is unsuitable for bulk transfer.
+
+Output contract
+Return one record per source ID with status placed or skipped and an explicit
+reason for skipped buildings. For a placed building return:
+- id, unsigned 32-bit seed, integer foundationY, measured envelope
+  { centerX, centerZ, lengthM, widthM, axisBearingDeg }, and frontBearingDeg
+  or null. Keep placement and measurements in the same world coordinate frame.
+- blocks as integer world { x, y, z, block } voxels if using this repository's
+  BlockId registry. For a separate repository or exchange file, send the
+  canonical Bedrock block name and typed state values instead of numerical IDs.
+  Resolve these to the receiving app's registry or report unsupported states.
+- chests and beds with world coordinates. Keep chest label and item stacks.
+  Write the block entities into the same chunks as their blocks. Reuse Bedrock NBT
+  conventions from the app's existing world writer.
+- clearances as half-open integer { x0, z0, x1, z1 } rectangles covering all
+  built and intentionally clear columns, including overhangs. Send these
+  independently of the input Overture footprint. Avoid repeated adjustments
+  to coordinates at export time.
+
+Testing and local acceptance
+1. Use fixtures/synthetic-buildings.geojsonseq as the input, and
+   fixtures/expected-world.json as an independent world-coordinate baseline.
+   fixtures/expected-footprint-cells.json holds the center-sampled cell masks.
+   All features are synthetic and their locations only serve the projection
+   test. Never merge these into production map data.
+2. From the app checkout, regenerate the fixtures with:
+   node --import tsx docs/building-handoff/generate-fixtures.mjs --repo .
+   The checked-in fixtures work on their own if a separate test repo has no
+   inw/grid.ts. Use the terrain recipe in expected-world.json to create a flat
+   in-memory 256 x 256 test crop with dry ground at Y=64, plus the listed road,
+   water, and POI masks. The first air block is Y=65. Keep the fixture store
+   separate from the real data/world directory.
+3. Assert geographic round-trip error <=0.02 m. For non-square cases compare
+   bearings modulo 180 within 0.5 degrees and dimensions within 0.2 m. For
+   raster masks compare all expected cells, allowing only documented floating
+   point ties very close to polygon edges. Verify the L-shaped notch and the
+   courtyard hole are still open, that multipart footprints retain their gap,
+   and that a building crosses negative X and Z chunk boundaries correctly.
+4. Assert the road, water, and POI conflicts are skipped with the correct
+   reasons, and that accepted building voxels do not enter those masks or have
+   duplicate positions. Validate deterministic output across reruns. Add an
+   adjacent-building overlap regression and verify the chosen winner is stable.
+   Assert each emitted roof and wall column is protected by clearance data,
+   and an actual foliage plan places no plant voxel in that reserved area.
+5. Produce one synthetic .mcworld using the real chunk writer into a temporary
+   output. Unzip it, reopen db/ with the app's LevelDB tooling, and assert
+   representative wall, roof, road, door, chest, and bed records, including the
+   negative chunk test. Check the spawn is clear. Run TypeScript and existing
+   house tests. Validate that standalone House Studio still works.
+6. Only then try two real sites inside the local map at http://127.0.0.1:4318/
+   with existing terrain data. Preview an angled house and a concave house,
+   export a new small crop, and compare building footprints, road access,
+   placement, and tree clearances. Record which cases ran, where outputs live,
+   and whether a live Bedrock import was tested.
+
+Source references
+Overture geometry and optional building properties
+https://docs.overturemaps.org/schema/v1.18.0/reference/buildings/building/
+Minimum-area rotated rectangle
+https://shapely.readthedocs.io/en/stable/reference/shapely.minimum_rotated_rectangle.html
