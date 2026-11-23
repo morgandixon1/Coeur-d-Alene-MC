@@ -15,6 +15,7 @@ import {
   CHUNK_VERSION,
   MAX_SUBCHUNK,
   MIN_SUBCHUNK,
+  TAG_BLOCK_ENTITY,
   TAG_DATA_3D,
   TAG_FINALIZED,
   TAG_SUBCHUNK,
@@ -25,6 +26,9 @@ import {
   fillSubChunk,
   localIndex,
 } from "@/lib/chunk";
+import type { Rect2D } from "@/lib/houses/footprint";
+import type { PlacedBuilding } from "@/lib/houses/footprint-place";
+import { bedTag, chestTag } from "@/lib/houses/pack";
 import { groundCover } from "@/lib/inw/ground";
 import { decodeRoads, rasterRoads, type Road } from "@/lib/inw/roads";
 import { NODATA, WORLD } from "@/lib/inw/grid";
@@ -293,21 +297,77 @@ async function loadRoads(): Promise<Road[]> {
   return roadCache;
 }
 
+export type RegionColumn = Column;
+
+export type RegionBuildOptions = {
+  buildings?: readonly PlacedBuilding[];
+  columnAt?: (x: number, z: number) => Promise<Column | null> | Column | null;
+  roadMarkAt?: (x: number, z: number) => number;
+};
+
 export async function buildRegionMcworld(
   raw: RegionSpec,
   onProgress?: (progress: RegionProgress) => void,
-): Promise<{ bytes: Uint8Array; fileName: string; spawn: { x: number; y: number; z: number }; columns: number; wet: number }> {
+  options?: RegionBuildOptions,
+): Promise<{
+  bytes: Uint8Array;
+  fileName: string;
+  spawn: { x: number; y: number; z: number };
+  columns: number;
+  wet: number;
+  clearances: Rect2D[];
+}> {
   const { x0, z0, size, name } = alignRegion(raw);
-  const roadGrid = rasterRoads(await loadRoads(), x0, z0, size);
+  const roadGrid = options?.roadMarkAt ? null : rasterRoads(await loadRoads(), x0, z0, size);
   const paved = (x: number, z: number) => {
+    if (options?.roadMarkAt) return options.roadMarkAt(x, z);
     const lx = x - x0;
     const lz = z - z0;
     if (lx < 0 || lz < 0 || lx >= size || lz >= size) return 0;
-    return roadGrid[lz * size + lx];
+    return roadGrid![lz * size + lx];
   };
+
+  // Index optional footprint-fitted buildings and their block entities by world coordinates & chunks.
+  const buildingBlocks = new Map<string, BlockId>();
+  const buildingMaxY = new Map<string, number>();
+  const blockEntities = new Map<string, Buffer[]>();
+  const clearances: Rect2D[] = [];
+  const addEntity = (x: number, z: number, tag: Buffer) => {
+    const id = `${Math.floor(x / 16)},${Math.floor(z / 16)}`;
+    let list = blockEntities.get(id);
+    if (!list) {
+      list = [];
+      blockEntities.set(id, list);
+    }
+    list.push(tag);
+  };
+  if (options?.buildings) {
+    for (const building of options.buildings) {
+      for (const rect of building.clearances) clearances.push(rect);
+      for (const b of building.blocks) {
+        if (b.x < x0 || b.x >= x0 + size || b.z < z0 || b.z >= z0 + size) continue;
+        buildingBlocks.set(`${b.x},${b.y},${b.z}`, b.block);
+        const colKey = `${b.x},${b.z}`;
+        const prev = buildingMaxY.get(colKey);
+        if (prev === undefined || b.y > prev) buildingMaxY.set(colKey, b.y);
+      }
+      for (const chest of building.chests) {
+        if (chest.x >= x0 && chest.x < x0 + size && chest.z >= z0 && chest.z < z0 + size) {
+          addEntity(chest.x, chest.z, chestTag(chest));
+        }
+      }
+      for (const bed of building.beds) {
+        if (bed.x >= x0 && bed.x < x0 + size && bed.z >= z0 && bed.z < z0 + size) {
+          addEntity(bed.x, bed.z, bedTag(bed));
+        }
+      }
+    }
+  }
+
   const chunks = size / 16;
   const chunksTotal = chunks * chunks;
-  const views = new ViewCache();
+  const views = options?.columnAt ? null : new ViewCache();
+  const getColumn = (x: number, z: number) => (options?.columnAt ? options.columnAt(x, z) : views!.column(x, z));
   const root = await mkdtemp(path.join(os.tmpdir(), "inw-region-"));
   const dbDir = path.join(root, "db");
   await mkdir(dbDir);
@@ -350,7 +410,7 @@ export async function buildRegionMcworld(
             for (let lx = 0; lx < 16; lx += 1) {
               const x = chunkX * 16 + lx;
               const z = chunkZ * 16 + lz;
-              const column = await views.column(x, z);
+              const column = await getColumn(x, z);
               local[lz * 16 + lx] = column;
               if (!column) {
                 heightmap[lz * 16 + lx] = HEIGHT.minY + 1;
@@ -359,14 +419,17 @@ export async function buildRegionMcworld(
               any = true;
               columns += 1;
               if (column.wet) wet += 1;
-              const top = column.surfaceY;
+              const bMax = buildingMaxY.get(`${x},${z}`);
+              const top = bMax !== undefined ? Math.max(column.surfaceY, bMax) : column.surfaceY;
               if (top > maxY) maxY = top;
               heightmap[lz * 16 + lx] = top + 1;
               if (
-                !spawn ||
-                Math.hypot(x + 0.5 - centerX, z + 0.5 - centerZ) < Math.hypot(spawn.x + 0.5 - centerX, spawn.z + 0.5 - centerZ)
+                !column.wet &&
+                bMax === undefined &&
+                (!spawn ||
+                  Math.hypot(x + 0.5 - centerX, z + 0.5 - centerZ) < Math.hypot(spawn.x + 0.5 - centerX, spawn.z + 0.5 - centerZ))
               ) {
-                if (!column.wet) spawn = { x, y: column.groundY + 1, z };
+                spawn = { x, y: column.groundY + 1, z };
               }
               if (iconSamples.length < 12000 && (lx + lz) % 2 === 0) iconSamples.push({ x, z, column });
             }
@@ -386,9 +449,13 @@ export async function buildRegionMcworld(
           const maxSub = Math.min(MAX_SUBCHUNK, Math.floor(maxY / 16));
           for (let subY = MIN_SUBCHUNK; subY <= maxSub; subY += 1) {
             fillSubChunk(section, subY, (lx, y, lz) => {
+              const wx = chunkX * 16 + lx;
+              const wz = chunkZ * 16 + lz;
+              const built = buildingBlocks.get(`${wx},${y},${wz}`);
+              if (built !== undefined) return built;
               const column = local[lz * 16 + lx];
               if (!column) return Block.Air;
-              return fillBlock(column, y, chunkX * 16 + lx, chunkZ * 16 + lz, paved(chunkX * 16 + lx, chunkZ * 16 + lz));
+              return fillBlock(column, y, wx, wz, paved(wx, wz));
             });
             // Keep bedrock strip even in empty lower sections when the shell starts higher.
             if (subY === Math.floor(HEIGHT.minY / 16)) {
@@ -406,6 +473,12 @@ export async function buildRegionMcworld(
             }
           }
 
+          const hereEntities = blockEntities.get(`${chunkX},${chunkZ}`);
+          if (hereEntities && hereEntities.length > 0) {
+            batch.put(chunkKey(chunkX, chunkZ, TAG_BLOCK_ENTITY), Buffer.concat(hereEntities));
+            pending += 1;
+          }
+
           if (pending > 200) flush();
         }
       }
@@ -417,7 +490,7 @@ export async function buildRegionMcworld(
     if (columns === 0) throw new Error("That rectangle has no terrain tiles yet.");
     if (!spawn) {
       // Entirely water: stand on the water surface near the center.
-      const fallback = await views.column(Math.floor(centerX), Math.floor(centerZ));
+      const fallback = await getColumn(Math.floor(centerX), Math.floor(centerZ));
       spawn = {
         x: Math.floor(centerX),
         y: (fallback?.surfaceY ?? 80) + 1,
@@ -439,7 +512,7 @@ export async function buildRegionMcworld(
       files[`db/${entry}`] = await readFile(path.join(dbDir, entry));
     }
     const bytes = zipSync(files, { level: 6 });
-    return { bytes, fileName: exportFileName({ x0, z0, size, name }), spawn, columns, wet };
+    return { bytes, fileName: exportFileName({ x0, z0, size, name }), spawn, columns, wet, clearances };
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -27,7 +27,7 @@ export function planRanch(price: Exclude<HousePrice,'any'>, random:()=>number):H
       coreW+=garage.w-1;
     }
     envelopes.push({x,z,w:coreW,d:coreD,stories:1,rooms:volumes.map(v=>v.id),roof:'shallow',ridge:'x'});
-    const wingW=int(10,12), segments=[int(5,6),5,int(5,6)], wingD=segments.reduce((a,b)=>a+b-1,1);
+    const wingW=int(10,12), segments=[int(6,7),5,int(6,7)], wingD=segments.reduce((a,b)=>a+b-1,1);
     const left=random()<0.5, wx=left?x:x+publicW-wingW, wz=z-wingD+1;
     const hx=left?wx+wingW-4:wx;
     const hall=add(hx,wz,4,wingD,'Hallway');
@@ -43,24 +43,42 @@ export function planRanch(price: Exclude<HousePrice,'any'>, random:()=>number):H
     }
     envelopes.push({x:wx,z:wz,w:wingW,d:wingD,stories:1,rooms:ids,roof:'gable',ridge:'z'});
   } else {
-    const w=int(24,28), frontD=int(6,7), rearD=int(5,6), hallD=4,d=frontD+rearD+hallD-2;
-    const x=-Math.floor(w/2),z=1-d;
-    const livingW=int(9,11),kitchenW=int(7,9),extraW=w-livingW-kitchenW+2;
-    const living=add(x,1-frontD,livingW,frontD,'Living room');
-    const kitchen=add(x+livingW-1,1-frontD,kitchenW,frontD,'Kitchen / dining');
-    const study=add(kitchen.x+kitchen.w-1,1-frontD,extraW,frontD,price==='upscale'?'Study':'Bedroom');
-    const hall=add(x,z+rearD-1,w,hallD,'Hallway');
-    for(const room of [living,kitchen,study]) join(room,hall,room.x+Math.floor(room.w/2),room.z,false);
-    const bathW=int(5,6),bedW=int(8,10),widths=random()<0.5?[bedW,bathW,w-bedW-bathW+2]:[w-bedW-bathW+2,bathW,bedW];
-    let rx=x;
-    for(const [i,rw] of widths.entries()) {
-      const room=add(rx,z,rw,rearD,i===1?'Bathroom':'Bedroom');
-      join(room,hall,rx+Math.floor(rw/2),hall.z,false);rx+=rw-1;
+    // Zone the main body into a public living/kitchen side (next to the garage)
+    // and a compact private bedroom/bath wing served by a short hallway.
+    const pubW=int(10,12), privW=int(13,16), w=pubW+privW-1;
+    const frontD=int(6,7), rearD=int(6,7), hallD=4, d=frontD+rearD+hallD-2;
+    const livD=frontD+hallD-1, kitD=d-livD+1;
+    const x=-Math.floor(w/2), z=1-d;
+    garageSide=random()<0.5?'left':'right';
+    const pubX=garageSide==='left'?x:x+privW-1;
+    const privX=garageSide==='left'?x+pubW-1:x;
+    const living=add(pubX,1-livD,pubW,livD,'Living room');
+    const kitchen=add(pubX,z,pubW,kitD,'Kitchen / dining');
+    join(living,kitchen,pubX+Math.floor(pubW/2),living.z,false);
+    const hall=add(privX,z+rearD-1,privW,hallD,'Hallway');
+    const splitX=garageSide==='left'?privX:pubX;
+    join(living,hall,splitX,hall.z+1+int(0,1),true);
+    const bathW=int(5,6), bedW=privW-bathW+1;
+    const rearRooms=random()<0.5
+      ? [{x:privX,w:bedW,use:'Bedroom' as const},{x:privX+bedW-1,w:bathW,use:'Bathroom' as const}]
+      : [{x:privX,w:bathW,use:'Bathroom' as const},{x:privX+bathW-1,w:bedW,use:'Bedroom' as const}];
+    for(const spec of rearRooms) {
+      const room=add(spec.x,z,spec.w,rearD,spec.use);
+      join(room,hall,room.x+Math.floor(room.w/2),hall.z,false);
+    }
+    if(price==='upscale') {
+      const frontBedW=Math.ceil((privW+1)/2), studyW=privW-frontBedW+1;
+      const frontBed=add(privX,1-frontD,frontBedW,frontD,'Bedroom');
+      const study=add(privX+frontBedW-1,1-frontD,studyW,frontD,'Study');
+      join(frontBed,hall,frontBed.x+Math.floor(frontBed.w/2),frontBed.z,false);
+      join(study,hall,study.x+Math.floor(study.w/2),study.z,false);
+    } else {
+      const frontBed=add(privX,1-frontD,privW,frontD,'Bedroom');
+      join(frontBed,hall,frontBed.x+Math.floor(frontBed.w/2),frontBed.z,false);
     }
     const main:Envelope={x,z,w,d,stories:1,rooms:volumes.map(v=>v.id),roof:family==='Long hip-roof ranch'?'hip':'shallow',ridge:'x'};
     envelopes.push(main);
     const gw=int(7,price==='starter'?8:10);
-    garageSide=random()<0.5?'left':'right';
     const gx=garageSide==='left'?x-gw+1:x+w-1;
     if(family==='Long hip-roof ranch') {
       garage=add(gx,z,gw,d,'Garage');
@@ -71,11 +89,10 @@ export function planRanch(price: Exclude<HousePrice,'any'>, random:()=>number):H
       envelopes.push({x:gx,z:garage.z,w:gw,d:gd,stories:1,rooms:[garage.id],roof:'hip',ridge:'z'});
     }
     const sharedX=garageSide==='left'?x:x+w-1;
-    const parent=garageSide==='left'?living:study;
-    // Side-entry homes connect to the public end, never through a bedroom.
-    if(parent.use==='Bedroom') parent.use='Study';
-    const lo=Math.max(parent.z,garage.z)+1,hi=Math.min(parent.z+parent.d-1,garage.z+garage.d-1)-1;
-    join(parent,garage,sharedX,int(lo,hi),true);
+    const kitLo=Math.max(kitchen.z,garage.z)+1, kitHi=Math.min(kitchen.z+kitchen.d-1,garage.z+garage.d-1)-1;
+    const livLo=Math.max(living.z,garage.z)+1, livHi=Math.min(living.z+living.d-1,garage.z+garage.d-1)-1;
+    if(kitHi>=kitLo) join(kitchen,garage,sharedX,int(kitLo,kitHi),true);
+    else join(living,garage,sharedX,int(livLo,livHi),true);
   }
   const living=volumes[0];
   const entry={x:int(living.x+2,living.x+living.w-3),z:0};

@@ -1,4 +1,5 @@
-import { HOUSE_ERAS, HOUSE_PRICES, HOUSE_STYLES, supportsTier, type HouseEra, type HousePrice, type HouseStyle } from "@/lib/houses/catalog";
+import { BLOCKS, type BlockId } from "@/lib/blocks";
+import { HOUSE_ERAS, HOUSE_PRICES, HOUSE_STYLES, supportsTier, type HouseEra, type HouseMaterialOverrides, type HousePrice, type HouseStyle } from "@/lib/houses/catalog";
 import { generateHouse } from "@/lib/houses/generate";
 import { packHouse } from "@/lib/houses/pack";
 
@@ -10,14 +11,28 @@ export async function POST(request: Request) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return Response.json({ error: "Send a house configuration as JSON." }, { status: 400 });
   }
-  const { style = "any", era = "any", price = "any", seed } = raw as Record<string, unknown>;
+  const { style = "any", era = "any", price = "any", seed, materials, overture } = raw as Record<string, unknown>;
   if (typeof style !== "string" || !Object.hasOwn(HOUSE_STYLES, style) ||
       typeof era !== "string" || !Object.hasOwn(HOUSE_ERAS, era) ||
       typeof price !== "string" || !Object.hasOwn(HOUSE_PRICES, price) ||
       (seed !== undefined && (typeof seed !== "number" || !Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff))) {
     return Response.json({ error: "Choose a valid style, era, tier, and optional seed from 0 to 4294967295." }, { status: 400 });
   }
-  const filters = { style: style as HouseStyle, era: era as HouseEra, price: price as HousePrice, seed: seed as number | undefined };
+  let parsedMaterials: HouseMaterialOverrides | undefined;
+  if (materials && typeof materials === "object" && !Array.isArray(materials)) {
+    const m = materials as Record<string, unknown>;
+    const valid = (v: unknown): BlockId | undefined =>
+      typeof v === "number" && Number.isInteger(v) && Object.hasOwn(BLOCKS, v) ? (v as BlockId) : undefined;
+    parsedMaterials = { wall: valid(m.wall), accent: valid(m.accent), trim: valid(m.trim), roof: valid(m.roof) };
+  }
+  const filters = {
+    style: style as HouseStyle,
+    era: era as HouseEra,
+    price: price as HousePrice,
+    seed: seed as number | undefined,
+    materials: parsedMaterials,
+    overture: overture === true,
+  };
   if (!supportsTier(filters.style, filters.price)) {
     return Response.json({ error: "That home style is unavailable at the selected tier." }, { status: 400 });
   }

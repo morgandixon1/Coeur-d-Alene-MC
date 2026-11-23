@@ -72,6 +72,7 @@ export const Block = {
   RoofSlab: 70,
   RoofTiles: 71,
   QuartzSlab: 72,
+  WhiteConcrete: 73,
 } as const;
 
 export type BlockId = (typeof Block)[keyof typeof Block];
@@ -292,6 +293,7 @@ export const BLOCKS: Record<BlockId, BlockDef> = {
   [Block.RoofSlab]: { name: "minecraft:deepslate_tile_slab", states: [{ kind: "byte", name: "top_slot_bit", value: 0 }], color: [58, 61, 65], scale: [1, 0.5, 1] },
   [Block.RoofTiles]: { name: "minecraft:deepslate_tiles", states: [], color: [58, 61, 65] },
   [Block.QuartzSlab]: { name: "minecraft:stone_block_slab", states: [{ kind: "string", name: "stone_slab_type", value: "quartz" }, { kind: "byte", name: "top_slot_bit", value: 0 }], color: [222, 219, 207], scale: [1, 0.5, 1] },
+  [Block.WhiteConcrete]: { name: "minecraft:white_concrete", states: [], color: [207, 213, 214] },
   [Block.Ladder]: {
     name: "minecraft:ladder",
     states: [{ kind: "string", name: "minecraft:cardinal_direction", value: "south" }],

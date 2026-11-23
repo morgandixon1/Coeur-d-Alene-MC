@@ -90,7 +90,7 @@ export function planSuburban(price: Exclude<HousePrice,'any'>, random:()=>number
     const entryX=garageLeft?living.x+2:living.x+living.w-3;
     const entry={x:entryX,z:projection};
     const signature=JSON.stringify({family,volumes,connections});
-    const plan:HousePlan={family,volumes,envelopes,connections,entry,signature,roofs:[],porchCanopy:family==='Cross-gable entry'||stories===2};
+    const plan:HousePlan={family,volumes,envelopes,connections,entry,signature,roofs:[],porchCanopy:envelopes.length<=2};
     if(reviewSuburban(plan).accepted) return plan;
   }
   throw new Error('Could not find a coherent suburban composition');

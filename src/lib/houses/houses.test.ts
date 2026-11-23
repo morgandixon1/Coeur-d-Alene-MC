@@ -39,6 +39,26 @@ test("every compatible style and tier keeps the furnished blocks and a clear spa
       if (style === "manufactured") {
         assert.equal(house.floors.length, 1);
         assert.doesNotMatch(house.specs, /garage/i);
+        assert.ok(house.chests.length > 0);
+        const trailerAllowed = new Set([
+          "minecraft:rotten_flesh", "minecraft:potato", "minecraft:bowl", "minecraft:bread",
+          "minecraft:stick", "minecraft:wooden_pickaxe", "minecraft:cobblestone", "minecraft:wooden_shovel",
+          "minecraft:string", "minecraft:feather", "minecraft:paper", "minecraft:leather_boots",
+          "minecraft:cod", "minecraft:coal", "minecraft:flint", "minecraft:bone", "minecraft:copper_ingot",
+        ]);
+        for (const chest of house.chests) {
+          for (const item of chest.items) assert.ok(trailerAllowed.has(item.name), `unexpected trailer loot: ${item.name}`);
+        }
+      }
+      const h = style === "pnw_modern" || style === "pnw_lodge" ? 5 : 4;
+      for (const b of house.blocks) {
+        if (b.block !== Block.Glowstone && b.block !== Block.SeaLantern) continue;
+        const inCeiling = b.y % h === 0;
+        const inWall = house.plan.volumes.some((v) =>
+          (b.x === v.x || b.x === v.x + v.w - 1 || b.z === v.z || b.z === v.z + v.d - 1) &&
+          b.x >= v.x && b.x < v.x + v.w && b.z >= v.z && b.z < v.z + v.d
+        );
+        assert.ok(inCeiling || inWall, `${style} ${price} seed ${seed}: light at (${b.x},${b.y},${b.z}) protrudes into room`);
       }
     }
   }
@@ -120,7 +140,7 @@ test("same-style seeds change footprint topology, room program, and roof composi
     const graph = (h: typeof houses[number]) => h.plan.connections.map(c => `${c.a}-${c.b}-${c.side}`).join("/");
     // Hall-based grammars deliberately restrict adjacency: bedrooms must not
     // become through-routes merely to increase the number of unique graphs.
-    if (!["manufactured", "suburban", "ranch", "craftsman"].includes(style)) assert.ok(new Set(houses.map(graph)).size >= 8, style);
+    if (!["manufactured", "suburban", "ranch", "craftsman", "farmhouse"].includes(style)) assert.ok(new Set(houses.map(graph)).size >= 8, style);
     for (const house of houses) {
       assert.equal(house.plan.connections.length, house.plan.volumes.length - 1);
       for (const a of house.plan.volumes) for (const b of house.plan.volumes) if (a.id < b.id) {
@@ -245,6 +265,7 @@ test('ranches keep a low silhouette and connect private rooms to halls', () => {
     const plan=house.plan;
     families.add(plan.family);
     assert.equal(house.floors.length,1);
+    assert.equal(house.chests.length,2);
     assert.ok(plan.roofs.length<=2);
     assert.ok(plan.roofs.every(r=>r.pitch>=3));
     assert.ok(house.blocks.some(b=>b.block===Block.RoofSlab));
@@ -307,4 +328,44 @@ test('Craftsman compositions keep porches usable, bedrooms private, and both flo
   assert.equal(families.size,4);assert.equal(hallAxes.size,2);assert.equal(porchForms.size,2);
   const batch=generateHouseBatch({style:'craftsman',price:'mid',seed:4});
   assert.equal(new Set(batch.map(h=>h.plan.family)).size,4);
+});
+
+test("Modern farmhouses split into a 1-story entry half, a 2-story stair half, and North Idaho white-and-timber theme", () => {
+  const families = new Set<string>();
+  const doors: number[] = [Block.OakDoorLower, Block.OakDoorUpper, Block.OakDoorEastLower, Block.OakDoorEastUpper];
+  const farmhouseWalls = new Set<number>([Block.WhiteConcrete, Block.WhiteTerracotta, Block.Quartz]);
+  for (const price of STYLE_TIERS.farmhouse) {
+    for (let seed = 0; seed < 50; seed++) {
+      const house = generateHouse({ style: "farmhouse", price, seed });
+      const plan = house.plan;
+      families.add(plan.family);
+      assert.ok(farmhouseWalls.has(house.materials.wall));
+
+      assert.equal(house.floors.length, 2, `${price} seed ${seed}: must be 2 stories`);
+      assert.equal(plan.envelopes.length, 2, `${price} seed ${seed}: must have 2 distinct halves`);
+      assert.equal(plan.envelopes[0].stories, 1, `${price} seed ${seed}: entry half must be 1 story`);
+      assert.equal(plan.envelopes[1].stories, 2, `${price} seed ${seed}: opposite half must be 2 stories`);
+      assert.ok(plan.envelopes[0].rooms.includes(0), `${price} seed ${seed}: entry room must be in the 1-story half`);
+      assert.ok(plan.envelopes[0].z !== plan.envelopes[1].z || plan.envelopes[0].d !== plan.envelopes[1].d, "must not be one flat rectangle");
+
+      const living = plan.volumes.find((v) => v.use === "Living room" && v.stories === 2)!;
+      assert.ok(living && plan.envelopes[1].rooms.includes(living.id), "2-story living room with stairs must be in opposite half");
+
+      // Verify upstairs rooms are all reachable from the stair landing
+      const cells = new Map(house.blocks.map((b) => [`${b.x},${b.y},${b.z}`, b.block]));
+      const queue = [{ x: living.x + 1, z: living.z + 2 }];
+      const seen = new Set<string>();
+      for (let i = 0; i < queue.length; i++) {
+        const { x, z } = queue[i], k = `${x},${z}`;
+        if (seen.has(k) || !plan.volumes.some((v) => v.stories === 2 && x >= v.x && x < v.x + v.w && z >= v.z && z < v.z + v.d)) continue;
+        if (![5, 6].every((y) => !cells.has(`${x},${y},${z}`) || doors.includes(cells.get(`${x},${y},${z}`)!))) continue;
+        seen.add(k);
+        queue.push({ x: x + 1, z }, { x: x - 1, z }, { x, z: z + 1 }, { x, z: z - 1 });
+      }
+      for (const v of plan.volumes.filter((r) => r.stories === 2)) {
+        assert.ok(seen.has(`${Math.floor(v.x + v.w / 2)},${Math.floor(v.z + v.d / 2)}`), `${price} seed ${seed}: unreachable upstairs ${v.use}`);
+      }
+    }
+  }
+  assert.equal(families.size, 4);
 });

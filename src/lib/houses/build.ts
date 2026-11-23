@@ -1,13 +1,14 @@
 import { buildCeilings } from "./ceilings";
 import { detailSuburban } from "./facade";
 import { detailCraftsman, buildCraftsmanPorch } from './craftsman-details';
+import { detailFarmhouse } from "./farmhouse";
 import type { RoofVolume } from "./roofs";
 import { Block as B, type BlockId } from '@/lib/blocks';
 import type { House, LootLocation, LootStack } from './generate';
 import type { HousePlan, Volume, RoomUse } from './plan';
 import type { HouseStyle } from './catalog';
 
-type Materials = { style: HouseStyle; rank: number; wall: BlockId; accent: BlockId; trim: BlockId; roofBlock: BlockId };
+type Materials = { style: HouseStyle; rank: number; wall: BlockId; accent: BlockId; trim: BlockId; roofBlock: BlockId; customRoof?: boolean };
 export function buildHouse(plan: HousePlan, m: Materials, random: () => number, loot: (label: LootLocation) => LootStack[]): Pick<House, 'blocks' | 'beds' | 'chests' | 'spawn' | 'floors'> {
   const cells = new Map<string, BlockId>();
   const beds: House['beds'] = [], chests: House['chests'] = [];
@@ -16,7 +17,8 @@ export function buildHouse(plan: HousePlan, m: Materials, random: () => number, 
   const suburban = m.style === 'suburban';
   const ranch = m.style === 'ranch';
   const craftsman = m.style === 'craftsman';
-  const slabRoof = suburban || ranch || craftsman;
+  const lodge = m.style === 'pnw_lodge';
+  const slabRoof = (suburban || ranch || craftsman) && !(m.customRoof && m.roofBlock !== B.RoofTiles && m.roofBlock !== B.RoofSlab);
   const key = (x: number, y: number, z: number) => `${x},${y},${z}`;
   const set = (x: number, y: number, z: number, b: BlockId | null) => b === null ? cells.delete(key(x,y,z)) : cells.set(key(x,y,z), b);
   const fill = (x1: number,y1: number,z1: number,x2: number,y2: number,z2: number,b: BlockId | null) => {
@@ -42,8 +44,11 @@ export function buildHouse(plan: HousePlan, m: Materials, random: () => number, 
           const body = plan.envelopes.find(e=>e.rooms.includes(v.id))!;
           const corner=(x===body.x||x===body.x+body.w-1)&&(z===body.z||z===body.z+body.d-1);
           const along=x===v.x||x===x2?z-v.z:x-v.x;
-          const window=exterior&&!corner&&along>1&&along<(x===v.x||x===x2?v.d:v.w)-2&&(modern?along%5!==0:along%5===2||along%5===3)&&y%h>=2&&y%h<h-1&&v.use!=='Garage';
-          set(x,y,z,window?B.Glass:corner?m.trim:plan.envelopes.findIndex(e=>e.rooms.includes(v.id))%3===1&&modern?m.accent:m.wall);
+          const window=exterior&&!corner&&along>1&&along<(x===v.x||x===x2?v.d:v.w)-2&&(modern?along%5!==0:lodge?along%4!==0:along%5===2||along%5===3)&&y%h>=(lodge||modern?1:2)&&y%h<h-1&&v.use!=='Garage';
+          const lodgePost = lodge && exterior && !corner && along % 4 === 0 && v.use !== 'Garage';
+          const modernMullion = modern && exterior && !corner && along % 5 === 0 && v.use !== 'Garage';
+          const modernSoffit = modern && exterior && !corner && y % h === h - 1;
+          set(x,y,z,window?B.Glass:corner||lodgePost||modernMullion?m.trim:modernSoffit?B.StrippedSpruce:plan.envelopes.findIndex(e=>e.rooms.includes(v.id))%3===1&&modern?m.accent:m.wall);
         }
       }
     }
@@ -61,10 +66,20 @@ export function buildHouse(plan: HousePlan, m: Materials, random: () => number, 
   }
   for(const [k,{y,edge}] of roofCells) {
     const [x,z]=k.split(',').map(Number);
-    set(x,Math.floor(y),z,slabRoof ? (Number.isInteger(y) ? B.RoofSlab : B.RoofTiles) : edge?m.trim:m.roofBlock);
+    set(x,Math.floor(y),z,slabRoof ? (Number.isInteger(y) ? B.RoofSlab : B.RoofTiles) : lodge && edge ? B.OakPlanks : (edge && m.style !== 'farmhouse') ? m.trim : m.roofBlock);
+  }
+  if(lodge) {
+    // Stone fireplace chimney rising on a side exterior wall 3 blocks above the roofline.
+    const mainEnv = plan.envelopes[0]!;
+    const chimX = mainEnv.x;
+    const chimZ = mainEnv.z + Math.floor(mainEnv.d / 2);
+    const roofAtChim = roofCells.get(`${chimX},${chimZ}`)?.y ?? mainEnv.stories * h;
+    const chimTop = Math.floor(roofAtChim) + 3;
+    fill(chimX, 0, chimZ, chimX, chimTop, chimZ + 1, m.accent);
   }
   if(suburban || ranch) detailSuburban(plan, h, m.wall, m.accent, set, ranch);
   if(craftsman) detailCraftsman(plan, h, m.wall, m.accent, m.trim, set);
+  if(m.style==='farmhouse') detailFarmhouse(plan, h, m.wall, m.accent, m.trim, set);
   const opening=(x:number,z:number,side:boolean,y=0)=> {
     set(x,y+1,z,side?B.OakDoorEastLower:B.OakDoorLower);
     set(x,y+2,z,side?B.OakDoorEastUpper:B.OakDoorUpper);
@@ -76,6 +91,8 @@ export function buildHouse(plan: HousePlan, m: Materials, random: () => number, 
   opening(plan.entry.x,plan.entry.z,false);
   const roomNames: string[][]=[[],[]];
   let safePlaced=false;
+  const hasGarage=plan.volumes.some(v=>v.use==='Garage');
+  let ranchBedroomChestPlaced=false;
   for(const v of plan.volumes) {
     const cx=Math.floor(v.x+v.w/2), cz=Math.floor(v.z+v.d/2);
     const exits=plan.connections.filter(c=>c.a===v.id||c.b===v.id);
@@ -133,8 +150,11 @@ export function buildHouse(plan: HousePlan, m: Materials, random: () => number, 
         if(!bed) throw new Error('Bedroom has no bed clearance');
         set(bed.x,y+1,bed.z,B.BedHead); set(bed.x,y+1,bed.z+1,B.BedFoot);
         beds.push({x:bed.x,y:y+1,z:bed.z},{x:bed.x,y:y+1,z:bed.z+1});
-        const label=m.rank===3&&!safePlaced?'Private safe':'Bedroom storage';
-        put(B.Chest,label); if(label==='Private safe') safePlaced=true;
+        if(!ranch || (!hasGarage && !ranchBedroomChestPlaced)) {
+          const label=m.rank===3&&!safePlaced?'Private safe':'Bedroom storage';
+          put(B.Chest,label); if(label==='Private safe') safePlaced=true;
+          if(ranch) ranchBedroomChestPlaced=true;
+        }
         put(B.Bookshelf);
       } else if(use==='Kitchen / dining') {
         const counter=put(B.Furnace);
@@ -154,10 +174,52 @@ export function buildHouse(plan: HousePlan, m: Materials, random: () => number, 
         put(B.WhiteWool,undefined,sofa);put(B.WhiteWool,undefined,sofa);
         put(B.QuartzSlab,undefined,sofa);put(B.BlackConcrete);
         if(use==='Study') {put(B.Bookshelf);put(B.Bookshelf);}
-        if(v.id===0) put(B.Chest,m.rank>=2?'Lake gear':'Tool storage');
+        if(v.id===0 && !ranch) put(B.Chest,m.rank>=2?'Lake gear':'Tool storage');
       }
-      // Place lights above clear circulation, never above a chest lid.
-      set(cx,y+h-1,cz,m.rank>1?B.SeaLantern:B.Glowstone);
+      // Integrate lights flush into the ceiling (when covered by roof above) or an interior wall,
+      // rather than protruding down into the room air.
+      const light = m.rank > 1 ? B.SeaLantern : B.Glowstone;
+      const ceilingY = y + h;
+      const hasRoofAbove = (x: number, z: number) => {
+        const roof = roofCells.get(`${x},${z}`);
+        return roof !== undefined && Math.floor(roof.y) > ceilingY;
+      };
+      let lightPlaced = false;
+      if (story === v.stories - 1) {
+        if (hasRoofAbove(cx, cz)) {
+          set(cx, ceilingY, cz, light);
+          lightPlaced = true;
+        } else {
+          const ceilingSpots: { x: number; z: number; dist: number }[] = [];
+          for (let x = v.x + 1; x < v.x + v.w - 1; x++) for (let z = v.z + 1; z < v.z + v.d - 1; z++) {
+            if (hasRoofAbove(x, z)) ceilingSpots.push({ x, z, dist: Math.abs(x - cx) + Math.abs(z - cz) });
+          }
+          ceilingSpots.sort((a, b) => a.dist - b.dist);
+          if (ceilingSpots[0]) {
+            set(ceilingSpots[0].x, ceilingY, ceilingSpots[0].z, light);
+            lightPlaced = true;
+          }
+        }
+      }
+      if (!lightPlaced) {
+        const ly = y + h - 1;
+        const wallSpots: { x: number; z: number; dist: number; shared: boolean }[] = [];
+        for (let x = v.x; x < v.x + v.w; x++) for (let z = v.z; z < v.z + v.d; z++) {
+          const onX = x === v.x || x === v.x + v.w - 1;
+          const onZ = z === v.z || z === v.z + v.d - 1;
+          if (onX === onZ) continue; // skip interior and corners
+          const existing = cells.get(key(x, ly, z));
+          if (existing === undefined || existing === B.Glass) continue;
+          const shared = plan.volumes.some(other => other !== v && inside(other, x, z) && other.stories * h > ly);
+          wallSpots.push({ x, z, dist: Math.abs(x - cx) + Math.abs(z - cz), shared });
+        }
+        wallSpots.sort((a, b) => Number(b.shared) - Number(a.shared) || a.dist - b.dist);
+        if (wallSpots[0]) {
+          set(wallSpots[0].x, ly, wallSpots[0].z, light);
+        } else {
+          set(cx, ceilingY, cz, light);
+        }
+      }
     }
     if(v.stories>1 && v.use==='Living room') {
       for(let i=0;i<h;i++) {
@@ -172,9 +234,26 @@ export function buildHouse(plan: HousePlan, m: Materials, random: () => number, 
   const porchWidth=m.style==='manufactured'?1:suburban?2:2+Math.floor(random()*2);
   const porchDepth=plan.porch?.d ?? 2+Math.floor(random()*3);
   if(craftsman && plan.porch) buildCraftsmanPorch(plan, h, m.accent, m.trim, set);
-  else fill(entryX-porchWidth,0,entryZ+1,entryX+porchWidth,0,entryZ+porchDepth,B.OakPlanks);
+  else fill(entryX-porchWidth,0,entryZ+1,entryX+porchWidth,0,entryZ+porchDepth,m.style==='farmhouse'||lodge?B.SprucePlanks:B.OakPlanks);
   if(plan.porchCanopy && !craftsman) {
-    for(const x of [entryX-porchWidth,entryX+porchWidth]) fill(x,1,entryZ+porchDepth,x,h-1,entryZ+porchDepth,m.trim);
+    for(const x of [entryX-porchWidth,entryX+porchWidth]) {
+      if(suburban) {
+        set(x,1,entryZ+porchDepth,m.accent);
+        fill(x,2,entryZ+porchDepth,x,h-1,entryZ+porchDepth,m.trim);
+        for(let z=entryZ+1;z<entryZ+porchDepth;z++) set(x,1,z,B.OakFence);
+      } else if(m.style==='farmhouse' || lodge) {
+        // Stone pier bases, heavy spruce timber posts, and spruce porch railings.
+        set(x,1,entryZ+porchDepth,m.accent);
+        fill(x,2,entryZ+porchDepth,x,h-1,entryZ+porchDepth,B.SpruceLog);
+        for(let z=entryZ+1;z<entryZ+porchDepth;z++) set(x,1,z,B.SpruceFence);
+      } else {
+        fill(x,1,entryZ+porchDepth,x,h-1,entryZ+porchDepth,m.trim);
+      }
+    }
+    if(m.style==='farmhouse' || lodge) {
+      // Heavy timber header beam across the porch front.
+      fill(entryX-porchWidth,h-1,entryZ+porchDepth,entryX+porchWidth,h-1,entryZ+porchDepth,B.StrippedSpruce);
+    }
     if(suburban) {
       for(let x=entryX-porchWidth-1;x<=entryX+porchWidth+1;x++) for(let z=entryZ;z<=entryZ+porchDepth+1;z++) {
         const rise=(porchWidth+1-Math.abs(x-entryX))/2;
@@ -184,7 +263,12 @@ export function buildHouse(plan: HousePlan, m: Materials, random: () => number, 
     } else fill(entryX-porchWidth-1,h,entryZ+1,entryX+porchWidth+1,h,entryZ+porchDepth+1,m.roofBlock);
   }
   fill(entryX-1,-1,entryZ+porchDepth+1,entryX+1,-1,entryZ+porchDepth+7,B.Gravel);
-  if(!craftsman) set(entryX-porchWidth,1,entryZ+1,B.Lantern);
+  if(!craftsman) {
+    if(suburban || m.style==='farmhouse' || lodge) {
+      set(entryX-porchWidth,2,entryZ+porchDepth+1,B.Lantern);
+      set(entryX+porchWidth,2,entryZ+porchDepth+1,B.Lantern);
+    } else set(entryX-porchWidth,1,entryZ+1,B.Lantern);
+  }
   // Give each wing an individually chosen roof height, but expose common floor cuts.
   return {
     blocks:[...cells.entries()].map(([k,block])=>{const [x,y,z]=k.split(',').map(Number);return {x,y,z,block};}),beds,chests,

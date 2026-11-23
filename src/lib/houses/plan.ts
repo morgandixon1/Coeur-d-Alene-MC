@@ -1,6 +1,7 @@
 import { planRanch } from "./ranch";
 import { planCraftsman } from './craftsman';
 import { planSuburban } from "./suburban";
+import { planFarmhouse } from "./farmhouse";
 import type { RoofVolume } from './roofs';
 import type { HouseStyle, HousePrice } from './catalog';
 import { ARCHITECTURE } from './architecture';
@@ -25,6 +26,7 @@ export function planHouse(style: Exclude<HouseStyle, 'any'>, price: Exclude<Hous
   if (style === 'ranch') return planRanch(price, random);
   if (style === 'craftsman') return planCraftsman(price, random);
   if (style === 'suburban') return planSuburban(price, random);
+  if (style === 'farmhouse') return planFarmhouse(price, random);
   const int = (a: number, b: number) => a + Math.floor(random() * (b - a + 1));
   const pick = <T>(items: readonly T[]) => items[int(0, items.length - 1)]!;
   const rank = ['starter', 'mid', 'upscale', 'luxury'].indexOf(price);

@@ -1,3 +1,5 @@
+import type { BlockId } from "@/lib/blocks";
+
 export const HOUSE_STYLES = {
   any: "Coeur d’Alene mix",
   manufactured: "Manufactured / trailer",
@@ -26,7 +28,20 @@ export const HOUSE_PRICES = {
 export type HouseStyle = keyof typeof HOUSE_STYLES;
 export type HouseEra = keyof typeof HOUSE_ERAS;
 export type HousePrice = keyof typeof HOUSE_PRICES;
-export type HouseRequest = { style?: HouseStyle; era?: HouseEra; price?: HousePrice; seed?: number };
+export type HouseMaterialOverrides = {
+  wall?: BlockId;
+  accent?: BlockId;
+  trim?: BlockId;
+  roof?: BlockId;
+};
+export type HouseRequest = {
+  style?: HouseStyle;
+  era?: HouseEra;
+  price?: HousePrice;
+  seed?: number;
+  materials?: HouseMaterialOverrides;
+  overture?: boolean;
+};
 
 export const STYLE_TIERS = {
   manufactured: ["starter", "mid"],

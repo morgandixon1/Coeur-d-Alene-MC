@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AmbientLight, BoxGeometry, Color, DirectionalLight, GridHelper, InstancedMesh, Matrix4, MeshLambertMaterial, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { BLOCKS, Block, type BlockId } from "@/lib/blocks";
-import { HOUSE_ERAS, HOUSE_PRICES, HOUSE_STYLES, supportsTier, type HouseEra, type HousePrice, type HouseStyle } from "@/lib/houses/catalog";
+import { BLOCKS, Block, blockLabel, blockSwatch, type BlockId } from "@/lib/blocks";
+import { getBlockTexture, type TextureMode } from "@/lib/block-textures";
+import { HOUSE_ERAS, HOUSE_PRICES, HOUSE_STYLES, supportsTier, type HouseEra, type HouseMaterialOverrides, type HousePrice, type HouseStyle } from "@/lib/houses/catalog";
 import { generateHouseBatch } from "@/lib/houses/batch";
 import { generateHouse, type House } from "@/lib/houses/generate";
 
@@ -13,7 +14,41 @@ const FIRST_HOUSE = generateHouse({ style: "suburban", era: "suburban90s", price
 const inputClass = "mt-1 w-full rounded-lg border border-[#d6d9cf] bg-[#fafbf7] px-3 py-2 text-sm text-[#182d27]";
 const chipClass = "rounded-full border border-white/20 px-3 py-1.5 text-xs font-medium";
 
-function HousePreview({ house, floor, massing = false }: { house: House; floor: number | null; massing?: boolean }) {
+const MATERIAL_CHOICES: readonly BlockId[] = [
+  Block.WhiteTerracotta,
+  Block.YellowTerracotta,
+  Block.GreenTerracotta,
+  Block.BrownTerracotta,
+  Block.OrangeTerracotta,
+  Block.RedTerracotta,
+  Block.WhiteConcrete,
+  Block.LightGrayConcrete,
+  Block.GrayConcrete,
+  Block.BlackConcrete,
+  Block.Quartz,
+  Block.Sandstone,
+  Block.Brick,
+  Block.StoneBricks,
+  Block.Cobblestone,
+  Block.MossyCobblestone,
+  Block.Stone,
+  Block.Basalt,
+  Block.OakPlanks,
+  Block.SprucePlanks,
+  Block.StrippedSpruce,
+  Block.OakLog,
+  Block.SpruceLog,
+  Block.RoofTiles,
+  Block.WhiteWool,
+];
+
+const TEXTURE_MODES: readonly { id: TextureMode; label: string }[] = [
+  { id: "pixel", label: "Pixel textures" },
+  { id: "smooth", label: "Smooth siding" },
+  { id: "flat", label: "Flat color" },
+];
+
+function HousePreview({ house, floor, massing = false, textureMode = "pixel" }: { house: House; floor: number | null; massing?: boolean; textureMode?: TextureMode }) {
   const holder = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -63,10 +98,12 @@ function HousePreview({ house, floor, massing = false }: { house: House; floor: 
       const def = BLOCKS[id];
       const [r, g, b] = def.color;
       const isGlass = id === Block.Glass;
+      const map = getBlockTexture(id, textureMode);
       const material = new MeshLambertMaterial({
-        color: new Color().setRGB(r / 255, g / 255, b / 255, "srgb"),
+        map: map ?? undefined,
+        color: map ? new Color(0xffffff) : new Color().setRGB(r / 255, g / 255, b / 255, "srgb"),
         transparent: isGlass,
-        opacity: isGlass ? 0.34 : 1,
+        opacity: isGlass ? (map ? 1 : 0.34) : 1,
         depthWrite: !isGlass,
         emissive: def.bright ? new Color("#9d7846") : undefined,
       });
@@ -89,18 +126,29 @@ function HousePreview({ house, floor, massing = false }: { house: House; floor: 
       meshes.push(mesh);
     }
     if (massing) {
-      const occupied = new Set<string>();
       const storyHeight = house.style === "pnw_modern" || house.style === "pnw_lodge" ? 5 : 4;
-      for (const [i,e] of house.plan.envelopes.entries()) {
-        const columns: {x:number;z:number}[] = [];
-        for(let x=e.x;x<e.x+e.w;x++) for(let z=e.z;z<e.z+e.d;z++) {
-          const key=`${x},${z}`;
-          if(!occupied.has(key)) {occupied.add(key);columns.push({x,z});}
+      if (house.footprint && house.footprint.cells.length > 0) {
+        const height = Math.max(1, house.floors.length) * storyHeight;
+        const material = new MeshLambertMaterial({ color: "#cab99a" });
+        const mesh = new InstancedMesh(unit, material, house.footprint.cells.length);
+        for (const [j, [x, z]] of house.footprint.cells.entries()) {
+          mesh.setMatrixAt(j, new Matrix4().makeScale(1, height, 1).setPosition(x, height / 2, z));
         }
-        const material = new MeshLambertMaterial({color:i===0?"#cab99a":"#6f8e80"});
-        const mesh = new InstancedMesh(unit,material,columns.length);
-        for(const [j,{x,z}] of columns.entries()) mesh.setMatrixAt(j,new Matrix4().makeScale(1,e.stories*storyHeight,1).setPosition(x,e.stories*storyHeight/2,z));
-        meshes.push(mesh);scene.add(mesh);
+        meshes.push(mesh);
+        scene.add(mesh);
+      } else {
+        const occupied = new Set<string>();
+        for (const [i,e] of house.plan.envelopes.entries()) {
+          const columns: {x:number;z:number}[] = [];
+          for(let x=e.x;x<e.x+e.w;x++) for(let z=e.z;z<e.z+e.d;z++) {
+            const key=`${x},${z}`;
+            if(!occupied.has(key)) {occupied.add(key);columns.push({x,z});}
+          }
+          const material = new MeshLambertMaterial({color:i===0?"#cab99a":"#6f8e80"});
+          const mesh = new InstancedMesh(unit,material,columns.length);
+          for(const [j,{x,z}] of columns.entries()) mesh.setMatrixAt(j,new Matrix4().makeScale(1,e.stories*storyHeight,1).setPosition(x,e.stories*storyHeight/2,z));
+          meshes.push(mesh);scene.add(mesh);
+        }
       }
     }
     scene.add(new AmbientLight("#e4edf1", 1.15));
@@ -143,7 +191,7 @@ function HousePreview({ house, floor, massing = false }: { house: House; floor: 
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [house, floor, massing]);
+  }, [house, floor, massing, textureMode]);
 
   return (
     <>
@@ -161,11 +209,26 @@ export function HouseStudio() {
   const [house, setHouse] = useState<House>(FIRST_HOUSE);
   const [floor, setFloor] = useState<number | null>(null);
   const [massing, setMassing] = useState(false);
+  const [textureMode, setTextureMode] = useState<TextureMode>("pixel");
   const [gallery, setGallery] = useState<House[]>([]);
   const [galleryFloor, setGalleryFloor] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dirty = style !== house.request.style || era !== house.request.era || price !== house.request.price || (seed !== "" && Number(seed) !== house.seed);
+
+  function updateMaterial(slot: keyof HouseMaterialOverrides, blockId: BlockId) {
+    const nextMaterials: HouseMaterialOverrides = {
+      ...(house.request.materials ?? {}),
+      [slot]: blockId,
+    };
+    setHouse(generateHouse({ ...house.request, materials: nextMaterials }));
+  }
+
+  function resetMaterials() {
+    const { materials: _unused, ...baseRequest } = house.request;
+    void _unused;
+    setHouse(generateHouse(baseRequest));
+  }
 
   function generate() {
     setError("");
@@ -175,7 +238,7 @@ export function HouseStudio() {
       return;
     }
     try {
-      setHouse(generateHouse({ style, era, price, seed: value }));
+      setHouse(generateHouse({ style, era, price, seed: value, overture: true }));
       setFloor(null);setMassing(false);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not generate a house."); }
   }
@@ -267,6 +330,43 @@ export function HouseStudio() {
               setSeed(String(house.seed));
             }}>Seed {house.seed}</button>
             {dirty && <p className="mt-2 text-xs text-[#755025]">Settings changed. Generate to update the preview.</p>}
+            <details open className="mt-3 border-t border-[#e3e6dc] pt-2">
+              <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold">
+                <span>Block materials</span>
+                {house.request.materials && (
+                  <button type="button" className="font-normal text-[#426253] underline underline-offset-2" onClick={(e) => { e.preventDefault(); resetMaterials(); }}>
+                    Reset
+                  </button>
+                )}
+              </summary>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {([
+                  ["wall", "Wall"],
+                  ["accent", "Accent"],
+                  ["trim", "Trim"],
+                  ["roof", "Roof"],
+                ] as const).map(([slot, label]) => {
+                  const current = house.materials[slot];
+                  return (
+                    <label key={slot} className="text-[11px] font-medium text-[#4e6258]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block h-2.5 w-2.5 rounded-xs border border-black/20" style={{ background: blockSwatch(current) }} />
+                        {label}
+                      </span>
+                      <select
+                        className="mt-1 w-full rounded-md border border-[#d6d9cf] bg-[#fafbf7] px-2 py-1 text-xs text-[#182d27]"
+                        value={current}
+                        onChange={(e) => updateMaterial(slot, Number(e.target.value) as BlockId)}
+                      >
+                        {MATERIAL_CHOICES.map((id) => (
+                          <option key={id} value={id}>{blockLabel(id)}</option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+            </details>
             <details className="mt-3 border-t border-[#e3e6dc] pt-2">
               <summary className="cursor-pointer text-xs font-semibold">{house.chests.length} stocked chests</summary>
               <ul className="mt-2 space-y-2 text-xs text-[#4e6258]">
@@ -284,7 +384,7 @@ export function HouseStudio() {
           {error && <p role="alert" className="text-sm text-[#a0382b]">{error}</p>}
         </aside>
         <section className="relative order-first h-[52dvh] min-h-80 bg-[#182b30] text-[#edf4ed] lg:order-none lg:h-full">
-          <HousePreview key={JSON.stringify(house.request)} house={house} floor={floor} massing={massing} />
+          <HousePreview key={`${house.seed}-${house.style}-${house.era}-${house.price}-${house.request.overture ? "ov" : "std"}`} house={house} floor={floor} massing={massing} textureMode={textureMode} />
           <div className="absolute top-4 left-4 flex flex-wrap gap-1.5" aria-label="Preview mode">
             <button type="button" aria-pressed={floor === null && !massing} className={`${chipClass} ${floor === null && !massing ? "bg-[#edf4ed] text-[#172d27]" : "bg-[#182b30]/90"}`} onClick={() => {setFloor(null);setMassing(false);}}>Exterior</button>
             <button type="button" aria-pressed={massing} className={`${chipClass} ${massing ? "bg-[#edf4ed] text-[#172d27]" : "bg-[#182b30]/90"}`} onClick={()=>{setFloor(null);setMassing(true);}}>Building shape</button>
@@ -294,6 +394,21 @@ export function HouseStudio() {
               </button>
             ))}
           </div>
+          {!massing && (
+            <div className="absolute top-4 right-4 flex flex-wrap gap-1.5" aria-label="Block texture style">
+              {TEXTURE_MODES.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  aria-pressed={textureMode === mode.id}
+                  className={`${chipClass} ${textureMode === mode.id ? "bg-[#edf4ed] text-[#172d27]" : "bg-[#182b30]/90"}`}
+                  onClick={() => setTextureMode(mode.id)}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="pointer-events-none absolute right-4 bottom-4 left-4 flex flex-wrap items-end justify-between gap-2 text-xs text-[#e0eae3]">
             {floor !== null && <p className="rounded-md bg-[#182b30]/85 px-2.5 py-1.5">{house.floors[floor].rooms.join(" · ")}</p>}
             <p className="ml-auto rounded-md bg-[#182b30]/85 px-2.5 py-1.5">Drag to orbit · Scroll to zoom · Right-drag to pan</p>
@@ -313,7 +428,7 @@ export function HouseStudio() {
             }}>Another 6 designs</button>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{gallery.map(candidate=><article key={candidate.seed} className="overflow-hidden rounded-xl border border-[#ccd3c6] bg-[#fafbf5]">
-            <div className="relative h-64 bg-[#182b30]"><HousePreview house={candidate} floor={galleryFloor ? 0 : null}/></div>
+            <div className="relative h-64 bg-[#182b30]"><HousePreview house={candidate} floor={galleryFloor ? 0 : null} textureMode={textureMode} /></div>
             <div className="p-3"><h3 className="font-semibold">{candidate.plan.family}</h3><p className="mt-1 text-xs text-[#52685b]">{candidate.specs} · Seed {candidate.seed}</p>
               <button className="mt-3 rounded-lg bg-[#234e40] px-4 py-2 text-sm text-white" onClick={()=>{setHouse(candidate);setSeed("");setFloor(null);setMassing(false);setGallery([]);}}>Inspect this design</button>
             </div>

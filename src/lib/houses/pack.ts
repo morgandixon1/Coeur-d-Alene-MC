@@ -22,7 +22,7 @@ import { levelDat } from "@/lib/inw/region-world";
 import { byte, compound, int, list, short, str, writeRoot } from "@/lib/nbt";
 import { type House, type HouseBed, type HouseChest } from "@/lib/houses/generate";
 
-function chestTag(chest: HouseChest): Buffer {
+export function chestTag(chest: HouseChest): Buffer {
   return writeRoot({
     id: str("Chest"),
     isMovable: byte(1),
@@ -45,7 +45,7 @@ function chestTag(chest: HouseChest): Buffer {
   });
 }
 
-function bedTag(bed: HouseBed): Buffer {
+export function bedTag(bed: HouseBed): Buffer {
   return writeRoot({
     id: str("Bed"),
     isMovable: byte(1),

@@ -36,6 +36,6 @@ export function planRoofs(volumes: readonly Volume[], style: HouseStyle, random:
     ...mass,
     roof:envelopes?.[i].roof ?? (i===0||random()<0.7?primary:pick(forms)),
     ridge:envelopes?.[i].ridge ?? (mass.w>mass.d+2?'x':mass.d>mass.w+2?'z':pick(['x','z'] as const)),
-    pitch:style==='ranch'?3:style==='suburban'||style==='craftsman'?2:trailer?3:mainPitch+(i>0&&random()<0.25?1:0),
+    pitch:style==='ranch'?3:style==='suburban'||style==='craftsman'||style==='farmhouse'?2:trailer?3:mainPitch+(i>0&&random()<0.25?1:0),
   }));
 }
