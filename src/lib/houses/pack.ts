@@ -20,9 +20,9 @@ import {
 } from "@/lib/chunk";
 import { levelDat } from "@/lib/inw/region-world";
 import { byte, compound, int, list, short, str, writeRoot } from "@/lib/nbt";
-import { type House, type HouseBed, type HouseChest } from "@/lib/houses/generate";
+import { type House, type HouseBed } from "@/lib/houses/generate";
 
-export function chestTag(chest: HouseChest): Buffer {
+export function chestTag(chest: { x: number; y: number; z: number; label: string; items: { name: string; count: number }[] }): Buffer {
   return writeRoot({
     id: str("Chest"),
     isMovable: byte(1),

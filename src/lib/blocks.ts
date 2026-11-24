@@ -73,6 +73,11 @@ export const Block = {
   RoofTiles: 71,
   QuartzSlab: 72,
   WhiteConcrete: 73,
+  OakStairEast: 74,
+  HangingSign: 75,
+  StoneBrickWall: 76,
+  CurtainBanner: 77,
+  ArmorStand: 78,
 } as const;
 
 export type BlockId = (typeof Block)[keyof typeof Block];
@@ -121,6 +126,10 @@ const LABELS: Partial<Record<BlockId, string>> = {
   [Block.RedWool]: "Red wool",
   [Block.YellowWool]: "Yellow wool",
   [Block.LimeWool]: "Lime wool",
+  [Block.HangingSign]: "Hanging sign",
+  [Block.StoneBrickWall]: "Stone brick wall",
+  [Block.CurtainBanner]: "Curtain banner",
+  [Block.ArmorStand]: "Armor stand",
 };
 
 export function blockLabel(id: BlockId): string {
@@ -281,6 +290,7 @@ export const BLOCKS: Record<BlockId, BlockDef> = {
   [Block.OakDoorEastLower]: door("east", 0),
   [Block.OakDoorEastUpper]: door("east", 1),
   [Block.OakStairWest]: stair(1),
+  [Block.OakStairEast]: stair(0),
   [Block.OakStairNorth]: stair(3),
   [Block.OakStairSouth]: stair(2),
   [Block.BedHead]: bed(1),
@@ -294,6 +304,33 @@ export const BLOCKS: Record<BlockId, BlockDef> = {
   [Block.RoofTiles]: { name: "minecraft:deepslate_tiles", states: [], color: [58, 61, 65] },
   [Block.QuartzSlab]: { name: "minecraft:stone_block_slab", states: [{ kind: "string", name: "stone_slab_type", value: "quartz" }, { kind: "byte", name: "top_slot_bit", value: 0 }], color: [222, 219, 207], scale: [1, 0.5, 1] },
   [Block.WhiteConcrete]: { name: "minecraft:white_concrete", states: [], color: [207, 213, 214] },
+  [Block.HangingSign]: {
+    name: "minecraft:oak_hanging_sign",
+    states: [
+      { kind: "byte", name: "hanging", value: 1 },
+      { kind: "int", name: "ground_sign_direction", value: 0 },
+    ],
+    color: [168, 132, 82],
+    scale: [0.84, 0.56, 0.14],
+  },
+  [Block.StoneBrickWall]: {
+    name: "minecraft:cobblestone_wall",
+    states: [{ kind: "string", name: "wall_block_type", value: "stone_brick" }],
+    color: [122, 121, 122],
+    scale: [0.56, 1, 0.56],
+  },
+  [Block.CurtainBanner]: {
+    name: "minecraft:standing_banner",
+    states: [{ kind: "int", name: "ground_sign_direction", value: 0 }],
+    color: [224, 224, 220],
+    scale: [0.88, 1, 0.1],
+  },
+  [Block.ArmorStand]: {
+    name: "minecraft:oak_fence",
+    states: [],
+    color: [176, 140, 88],
+    scale: [0.5, 1, 0.5],
+  },
   [Block.Ladder]: {
     name: "minecraft:ladder",
     states: [{ kind: "string", name: "minecraft:cardinal_direction", value: "south" }],

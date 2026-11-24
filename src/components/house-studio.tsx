@@ -271,7 +271,10 @@ export function HouseStudio() {
       <div className="grid min-h-dvh lg:h-full lg:min-h-0 lg:grid-cols-[minmax(300px,355px)_1fr]">
         <aside className="flex flex-col gap-4 border-r border-[#cad0c4] bg-[#f5f5ed] p-5 lg:overflow-y-auto">
           <header>
-            <Link href="/" className="text-xs font-medium text-[#426253] hover:underline">← Spawnwright</Link>
+            <div className="flex items-center justify-between gap-2 text-xs font-medium text-[#426253]">
+              <Link href="/" className="hover:underline">← Spawnwright</Link>
+              <Link href="/commercial" className="hover:underline">Commercial studio →</Link>
+            </div>
             <p className="mt-3 text-[10px] font-semibold tracking-[0.22em] text-[#567264] uppercase">North Idaho · House studio</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">Coeur d’Alene houses</h1>
             <p className="mt-1.5 text-sm leading-relaxed text-[#4e6258]">Roll furnished Minecraft homes from 1990 onward, from plain trailers to custom lake estates.</p>

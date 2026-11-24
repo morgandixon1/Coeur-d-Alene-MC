@@ -14,6 +14,7 @@ npm run dev
 | Local page | What you can generate |
 | --- | --- |
 | [House Studio](http://localhost:4317/houses) | Pick a style, era, tier, and seed. Compare six designs, inspect floor plans and loot, and export a furnished house as a standalone Bedrock world. No geographic data is needed. |
+| [Commercial Studio](http://localhost:4317/commercial) | Pick a commercial building type, era, scale, and seed. Compare six designs, inspect floor plans and stocked chests, customize block materials, and export a standalone Bedrock world. No geographic data is needed. |
 | [Terrain Generator](http://localhost:4317/terrain) | Create a small procedural world with a controlled seed, terrain style, and spawn. No geographic data is needed. |
 | [Regional Map](http://localhost:4317/) | View locally built Inland Northwest map tiles and export a selected area as a Bedrock world. |
 | [Arnis Archive](http://localhost:4317/arnis) | Preview local Bedrock archives under `data/archive/arnis/worlds/` or `data/archive/arnis/inland-northwest/`. |

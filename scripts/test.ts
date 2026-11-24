@@ -2,3 +2,4 @@
 import "../src/lib/format.test";
 import "../src/lib/houses/houses.test";
 import "../src/lib/houses/footprint.test";
+import "../src/lib/commercial/commercial.test";

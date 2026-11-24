@@ -54,9 +54,12 @@ function patternFor(id: BlockId): PatternKind {
     case Block.OakStairNorth:
     case Block.OakStairSouth:
     case Block.OakStairWest:
+    case Block.OakStairEast:
     case Block.OakFence:
     case Block.SpruceFence:
     case Block.OakSign:
+    case Block.HangingSign:
+    case Block.ArmorStand:
     case Block.Ladder:
       return "planks";
     case Block.OakLog:
@@ -67,6 +70,7 @@ function patternFor(id: BlockId): PatternKind {
     case Block.Brick:
       return "brick";
     case Block.StoneBricks:
+    case Block.StoneBrickWall:
       return "stone_bricks";
     case Block.Cobblestone:
     case Block.MossyCobblestone:
@@ -108,6 +112,7 @@ function patternFor(id: BlockId): PatternKind {
     case Block.LimeWool:
     case Block.BedHead:
     case Block.BedFoot:
+    case Block.CurtainBanner:
       return "wool";
     case Block.OakDoorLower:
     case Block.OakDoorUpper:
